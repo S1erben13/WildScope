@@ -1,5 +1,7 @@
 import argparse
 import logging
+import subprocess
+
 from database import clear_products, get_db_connection
 
 logger = logging.getLogger(__name__)
@@ -26,14 +28,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Database management utility"
     )
-    parser.add_argument(
-        "command",
-        help="Command to execute (available: clear_db)"
-    )
+    subparsers = parser.add_subparsers(dest='command', required=True)
+
+    parser_clear = subparsers.add_parser('clear_db', help='Clear the database')
+
+    parser_search = subparsers.add_parser('search', help='Search products')
+    parser_search.add_argument('query', nargs='+', help='Search query')
 
     args = parser.parse_args()
 
     if args.command == "clear_db":
         clear_db()
-    else:
-        logger.error(f"Unknown command: {args.command}")
+    elif args.command == "search":
+        search_query = ' '.join(args.query)
+        subprocess.run(["python", "main.py", search_query])

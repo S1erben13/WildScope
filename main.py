@@ -1,4 +1,5 @@
 import logging
+import sys
 from urllib.parse import quote
 
 import requests
@@ -98,7 +99,11 @@ def display_sample_products(conn):
 def main():
     """Main function to execute the product fetching and processing."""
     try:
-        search_query = input("Enter search query: ")
+        all_args = sys.argv[1:]
+        search_query = ' '.join(all_args)
+
+        logger.info(f"\nSearching products for query: {search_query}")
+
         products = fetch_wildberries_products(search_query)
 
         logger.info(f"\nFound products: {len(products)}")
