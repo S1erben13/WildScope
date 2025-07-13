@@ -101,31 +101,43 @@ def clear_products(conn: Any) -> bool:
         logger.error(f"Error clearing products: {e}")
         raise
 
+
 def get_products(
     conn: Any,
     min_price: int | None = None,
     max_price: int | None = None,
+    exact_price: int | None = None,
     min_rating: float | None = None,
+    max_rating: float | None = None,
+    exact_rating: float | None = None,
     min_feedbacks: int | None = None,
+    max_feedbacks: int | None = None,
+    exact_feedbacks: int | None = None,
 ) -> list[dict]:
-    """Get filtered products from database."""
+    """Get filtered products from the database with flexible filtering options."""
     try:
         with conn.cursor() as cursor:
             query = "SELECT * FROM Product WHERE 1=1"
             params = []
 
-            if min_price is not None:
-                query += " AND price >= %s"
-                params.append(min_price)
-            if max_price is not None:
-                query += " AND price <= %s"
-                params.append(max_price)
-            if min_rating is not None:
-                query += " AND rating >= %s"
-                params.append(min_rating)
-            if min_feedbacks is not None:
-                query += " AND feedbacks >= %s"
-                params.append(min_feedbacks)
+            # Define filter groups (field, exact, min, max)
+            filters = [
+                ("price", exact_price, min_price, max_price),
+                ("rating", exact_rating, min_rating, max_rating),
+                ("feedbacks", exact_feedbacks, min_feedbacks, max_feedbacks),
+            ]
+
+            for field, exact, min_val, max_val in filters:
+                if exact is not None:
+                    query += f" AND {field} = %s"
+                    params.append(exact)
+                else:
+                    if min_val is not None:
+                        query += f" AND {field} >= %s"
+                        params.append(min_val)
+                    if max_val is not None:
+                        query += f" AND {field} <= %s"
+                        params.append(max_val)
 
             cursor.execute(query, params)
             columns = [desc[0] for desc in cursor.description]
