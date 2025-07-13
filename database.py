@@ -89,6 +89,18 @@ def add_product(
         logger.error(f"Error adding product: {e}")
         raise
 
+def clear_products(conn: Any) -> bool:
+    """Clear all records from Product table."""
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM Product;")
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error clearing products: {e}")
+        raise
+
 def get_products(
     conn: Any,
     min_price: int | None = None,
