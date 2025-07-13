@@ -1,0 +1,161 @@
+import logging
+import os
+from contextlib import contextmanager
+from typing import Any
+
+import psycopg2
+from dotenv import load_dotenv
+from psycopg2 import OperationalError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def load_env_vars() -> dict[str, str]:
+    """Load environment variables from .env file."""
+    load_dotenv()
+    return {
+        "dbname": os.getenv("POSTGRES_DB"),
+        "user": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+        "host": os.getenv("POSTGRES_HOST", "localhost"),
+        "port": os.getenv("POSTGRES_PORT", "5432"),
+    }
+
+
+def create_tables(conn: Any) -> None:
+    """Create required tables in the database."""
+    tables = {
+        "Product": """
+            CREATE TABLE IF NOT EXISTS Product (
+                wb_id BIGINT PRIMARY KEY,
+                product_name TEXT NOT NULL,
+                price DECIMAL NOT NULL,
+                discount_price INTEGER NOT NULL,
+                rating FLOAT NOT NULL,
+                feedbacks INTEGER NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """
+    }
+
+    try:
+        with conn.cursor() as cursor:
+            for table_name, create_query in tables.items():
+                cursor.execute(create_query)
+                logger.info(f"Table '{table_name}' created or already exists")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error creating tables: {e}")
+        raise
+
+
+def add_product(
+    conn: Any,
+    wb_id: int,
+    product_name: str,
+    price: float,
+    discount_price: int,
+    rating: float,
+    feedbacks: int,
+) -> bool:
+    """Add new product to database or update if exists."""
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO Product (
+                    wb_id,
+                    product_name,
+                    price,
+                    discount_price,
+                    rating,
+                    feedbacks
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (wb_id) DO UPDATE SET
+                    product_name = EXCLUDED.product_name,
+                    price = EXCLUDED.price,
+                    discount_price = EXCLUDED.discount_price,
+                    rating = EXCLUDED.rating,
+                    feedbacks = EXCLUDED.feedbacks;
+                """,
+                (wb_id, product_name, price, discount_price, rating, feedbacks),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error adding product: {e}")
+        raise
+
+def get_products(
+    conn: Any,
+    min_price: int | None = None,
+    max_price: int | None = None,
+    min_rating: float | None = None,
+    min_feedbacks: int | None = None,
+) -> list[dict]:
+    """Get filtered products from database."""
+    try:
+        with conn.cursor() as cursor:
+            query = "SELECT * FROM Product WHERE 1=1"
+            params = []
+
+            if min_price is not None:
+                query += " AND price >= %s"
+                params.append(min_price)
+            if max_price is not None:
+                query += " AND price <= %s"
+                params.append(max_price)
+            if min_rating is not None:
+                query += " AND rating >= %s"
+                params.append(min_rating)
+            if min_feedbacks is not None:
+                query += " AND feedbacks >= %s"
+                params.append(min_feedbacks)
+
+            cursor.execute(query, params)
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    except Exception as e:
+        logger.error(f"Error reading products: {e}")
+        raise
+
+
+@contextmanager
+def get_db_connection():
+    """Context manager for database connections."""
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            dbname=db_config["dbname"],
+            user=db_config["user"],
+            password=db_config["password"],
+            host=db_config["host"],
+            port=db_config["port"],
+        )
+        yield conn
+    except OperationalError as e:
+        logger.error(f"Database connection error: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+db_config = load_env_vars()
+
+
+def main() -> None:
+    """Main function to initialize database tables."""
+    try:
+        with get_db_connection() as conn:
+            create_tables(conn)
+    except Exception as e:
+        logger.error(f"Initialization error: {e}")
+
+
+if __name__ == "__main__":
+    main()

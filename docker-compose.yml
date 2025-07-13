@@ -20,7 +20,7 @@ services:
 
   web:
     build: .
-    command: bash -c "python run.py"
+    command: bash -c "python database.py && uvicorn api:app --reload"
     volumes:
       - .:/app
     ports:
