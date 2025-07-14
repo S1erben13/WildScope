@@ -40,5 +40,6 @@ if __name__ == "__main__":
     if args.command == "clear_db":
         clear_db()
     elif args.command == "search":
-        search_query = ' '.join(args.query)
-        subprocess.run(["python", "main.py", search_query])
+        quantity = args.query[0]
+        search_query = ' '.join(args.query[1:])
+        subprocess.run(["python", "main.py", quantity, search_query])
