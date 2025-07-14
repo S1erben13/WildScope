@@ -202,7 +202,7 @@ function applyFilters() {
  */
 function resetFilters() {
     priceSlider.noUiSlider.set([0, 50000]);
-    ratingFilter.value = '4.0';
+    ratingFilter.value = '0.0';
     feedbackFilter.value = '0';
     applyFilters();
 }
@@ -252,7 +252,8 @@ function updatePriceHistogram(products) {
         {min: 10000, max: 19999, label: '10,000-19,999'},
         {min: 20000, max: 29999, label: '20,000-29,999'},
         {min: 30000, max: 39999, label: '30,000-39,999'},
-        {min: 40000, max: 50000, label: '40,000-50,000'}
+        {min: 40000, max: 49999, label: '40,000-49,999'},
+        {min: 50000, label: '> 50,000'}
     ];
 
     const labels = priceRanges.map(range => range.label);
@@ -301,6 +302,8 @@ function updateDiscountRatingChart(products) {
     }
 
     products.forEach(product => {
+        if (product.rating === null || product.rating === undefined) return;
+
         const roundedRating = Math.round(product.rating * 2) / 2;
         const ratingKey = roundedRating.toFixed(1);
         const discount = ((product.price - product.discount_price) / product.price) * 100;
@@ -314,18 +317,37 @@ function updateDiscountRatingChart(products) {
     const labels = [];
     const data = [];
     const backgroundColors = [];
+    const borderColors = [];
+    const pointBackgroundColors = [];
+    const pointBorders = [];
+    const pointBorderWidths = [];
+    const pointHoverRadius = [];
 
     for (let r = minRating; r <= maxRating; r += step) {
         const ratingKey = r.toFixed(1);
         labels.push(ratingKey);
 
         if (ratingGroups[ratingKey] && ratingGroups[ratingKey].count > 0) {
-            data.push(ratingGroups[ratingKey].totalDiscount / ratingGroups[ratingKey].count);
+            const avgDiscount = ratingGroups[ratingKey].totalDiscount / ratingGroups[ratingKey].count;
+            data.push(avgDiscount);
+
             const hue = (r / maxRating) * 120;
             backgroundColors.push(`hsla(${hue}, 70%, 50%, 0.2)`);
+            borderColors.push(`hsla(${hue}, 70%, 50%, 1)`);
+            pointBackgroundColors.push(`hsla(${hue}, 70%, 50%, 1)`);
+            pointBorders.push('#ffffff');
+            pointBorderWidths.push(2);
+            pointHoverRadius.push(8);
         } else {
-            data.push(null);
+            const prevValue = data.length > 0 ? data[data.length-1] : 0;
+            data.push(prevValue);
+
             backgroundColors.push('rgba(200, 200, 200, 0.1)');
+            borderColors.push('rgba(200, 200, 200, 0.5)');
+            pointBackgroundColors.push('rgba(200, 200, 200, 0.5)');
+            pointBorders.push('#ffffff');
+            pointBorderWidths.push(1);
+            pointHoverRadius.push(6);
         }
     }
 
@@ -338,31 +360,102 @@ function updateDiscountRatingChart(products) {
             datasets: [{
                 label: 'Average discount (%)',
                 data: data,
-                backgroundColor: backgroundColors,
+                backgroundColor: function(context) {
+                    const bgColor = [];
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+
+                    if (!chartArea) return;
+
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, 'rgba(75, 192, 192, 0.4)');
+                    gradient.addColorStop(1, 'rgba(75, 192, 192, 0.1)');
+
+                    return gradient;
+                },
                 borderColor: 'rgba(75, 192, 192, 1)',
                 borderWidth: 2,
-                tension: 0.1,
-                fill: true,
-                pointBackgroundColor: 'rgba(75, 192, 192, 1)',
-                pointRadius: 5,
-                pointHoverRadius: 7
+                tension: 0.4,
+                fill: {
+                    target: 'origin',
+                    above: function(context) {
+                        const chart = context.chart;
+                        const {ctx, chartArea} = chart;
+
+                        if (!chartArea) return;
+
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(75, 192, 192, 0.4)');
+                        gradient.addColorStop(1, 'rgba(75, 192, 192, 0.1)');
+
+                        return gradient;
+                    }
+                },
+                pointBackgroundColor: pointBackgroundColors,
+                pointBorderColor: pointBorders,
+                pointBorderWidth: pointBorderWidths,
+                pointRadius: function(context) {
+                    const index = context.dataIndex;
+                    return ratingGroups[labels[index]]?.count > 0 ? 5 : 3;
+                },
+                pointHoverRadius: pointHoverRadius,
+                segment: {
+                    borderColor: ctx => {
+                        const prevPoint = ctx.p0.parsed.y;
+                        const currPoint = ctx.p1.parsed.y;
+                        return Math.abs(currPoint - prevPoint) > 20 ? 'rgba(200, 200, 200, 0.5)' : 'rgba(75, 192, 192, 1)';
+                    },
+                    borderDash: ctx => {
+                        const prevPoint = ctx.p0.parsed.y;
+                        const currPoint = ctx.p1.parsed.y;
+                        return Math.abs(currPoint - prevPoint) > 20 ? [5, 5] : undefined;
+                    }
+                }
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Discount: ${context.parsed.y.toFixed(2)}%`;
+                            const ratingKey = context.label;
+                            const count = ratingGroups[ratingKey]?.count || 0;
+                            if (count === 0) return 'No data available';
+                            return [
+                                `Discount: ${context.parsed.y?.toFixed(2) || 'N/A'}%`,
+                                `Products: ${count}`
+                            ];
                         }
                     }
                 }
             },
             scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Average discount (%)' }, min: 0, max: 100 },
-                x: { title: { display: true, text: 'Rating (step 0.5)' } }
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Average discount (%)' },
+                    min: 0,
+                    max: 100,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    title: { display: true, text: 'Rating (step 0.5)' },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            elements: {
+                line: {
+                    cubicInterpolationMode: 'monotone'
+                }
             }
         }
     });
