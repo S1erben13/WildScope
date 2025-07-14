@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import contextmanager
+from decimal import Decimal
 from typing import Any
 
 import psycopg2
@@ -55,9 +56,9 @@ def add_product(
     conn: Any,
     wb_id: int,
     product_name: str,
-    price: float,
-    discount_price: int,
-    rating: float,
+    price: float,          # или сразу Decimal, если возможно
+    discount_price: float, # поменяйте int на float (или Decimal)
+    rating: float,         # или Decimal
     feedbacks: int,
 ) -> bool:
     """Add new product to database or update if exists."""
@@ -80,7 +81,14 @@ def add_product(
                     rating = EXCLUDED.rating,
                     feedbacks = EXCLUDED.feedbacks;
                 """,
-                (wb_id, product_name, price, discount_price, rating, feedbacks),
+                (
+                    wb_id,
+                    product_name,
+                    Decimal(str(price)),          # Явное преобразование float → Decimal
+                    Decimal(str(discount_price)), # И для discount_price тоже
+                    Decimal(str(rating)),         # Чтобы рейтинг не округлялся
+                    feedbacks
+                ),
             )
             conn.commit()
             return cursor.rowcount > 0

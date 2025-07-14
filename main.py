@@ -27,7 +27,7 @@ def fetch_wildberries_products(search_query: str, limit=10) -> list:
     params = {
         "query": search_query,
         "resultset": "catalog",
-        "sort": "popular", #pricedown #priceup
+        # "sort": "newest", #pricedown #priceup
         "dest": -1257786,
         "regions": "80,64,38,4,115,83,33,68,70,69,30,86,75,40,1,66,48,110,31,22,71,114",
         "limit": limit,
@@ -69,7 +69,7 @@ def process_products(products: list) -> int:
                 product_name=product_name,
                 price=product.get("priceU", 0) // 100,
                 discount_price=product.get("salePriceU", 0) // 100,
-                rating=product.get("rating", 0),
+                rating=product.get("reviewRating", 0),
                 feedbacks=product.get("feedbacks", 0),
             )
             if success:
