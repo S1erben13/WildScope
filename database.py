@@ -28,14 +28,14 @@ def create_tables(conn: Any) -> None:
     tables = {
         "Product": """
             CREATE TABLE IF NOT EXISTS Product (
-                wb_id BIGINT PRIMARY KEY,
-                product_name TEXT NOT NULL,
-                price DECIMAL NOT NULL,
-                discount_price INTEGER NOT NULL,
-                rating FLOAT NOT NULL,
-                feedbacks INTEGER NOT NULL,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
+            wb_id BIGINT PRIMARY KEY,
+            product_name TEXT NOT NULL,
+            price DECIMAL(10, 2) NOT NULL,
+            discount_price DECIMAL(10, 2) NOT NULL,
+            rating DECIMAL(2, 1) NOT NULL,
+            feedbacks INTEGER NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
         """
     }
 
@@ -115,12 +115,13 @@ def get_products(
     exact_feedbacks: int | None = None,
 ) -> list[dict]:
     """Get filtered products from the database with flexible filtering options."""
+    if conn is None:
+        raise ValueError("Database connection is not established")
     try:
         with conn.cursor() as cursor:
             query = "SELECT * FROM Product WHERE 1=1"
             params = []
 
-            # Define filter groups (field, exact, min, max)
             filters = [
                 ("price", exact_price, min_price, max_price),
                 ("rating", exact_rating, min_rating, max_rating),
@@ -129,14 +130,14 @@ def get_products(
 
             for field, exact, min_val, max_val in filters:
                 if exact is not None:
-                    query += f" AND {field} = %s"
+                    query += " AND {} = %s".format(field)
                     params.append(exact)
                 else:
                     if min_val is not None:
-                        query += f" AND {field} >= %s"
+                        query += " AND {} >= %s".format(field)
                         params.append(min_val)
                     if max_val is not None:
-                        query += f" AND {field} <= %s"
+                        query += " AND {} <= %s".format(field)
                         params.append(max_val)
 
             cursor.execute(query, params)
