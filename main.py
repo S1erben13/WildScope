@@ -8,12 +8,13 @@ from database import add_product, get_db_connection, get_products
 logger = logging.getLogger(__name__)
 
 
-def fetch_wildberries_products(search_query: str) -> list:
+def fetch_wildberries_products(search_query: str, limit=10) -> list:
     """
     Fetch products from Wildberries API for given search query.
 
     Args:
         search_query: Search term to query Wildberries
+        :param limit:
 
     Returns:
         List of product dictionaries
@@ -22,15 +23,14 @@ def fetch_wildberries_products(search_query: str) -> list:
         requests.exceptions.RequestException: If API request fails
         ValueError: If response parsing fails
     """
-    encoded_query = quote(search_query)
     url = "https://search.wb.ru/exactmatch/ru/common/v4/search"
     params = {
-        "query": encoded_query,
+        "query": search_query,
         "resultset": "catalog",
-        "sort": "popular",
+        "sort": "popular", #pricedown #priceup
         "dest": -1257786,
         "regions": "80,64,38,4,115,83,33,68,70,69,30,86,75,40,1,66,48,110,31,22,71,114",
-        "limit": 30,
+        "limit": limit,
     }
 
     response = requests.get(url, params=params)
@@ -99,12 +99,14 @@ def display_sample_products(conn):
 def main():
     """Main function to execute the product fetching and processing."""
     try:
-        all_args = sys.argv[1:]
+        all_args = sys.argv[2:]
+        quantity = int(sys.argv[1])
         search_query = ' '.join(all_args)
-
+        logging.info(f'main.py search_query: "{search_query}"')
+        logging.info(f'main.py quantity: "{quantity}"')
         logger.info(f"\nSearching products for query: {search_query}")
 
-        products = fetch_wildberries_products(search_query)
+        products = fetch_wildberries_products(search_query, quantity)
 
         logger.info(f"\nFound products: {len(products)}")
 
@@ -112,7 +114,7 @@ def main():
             if conn:
                 added_count = process_products(products)
                 logger.info(f"Added to DB: {added_count} products")
-                display_sample_products(conn)
+                # display_sample_products(conn)
             else:
                 logger.error("Database connection error")
 
