@@ -114,7 +114,7 @@ async function sendProductsRequest() {
         showAlert('Error: ' + error.message, 'danger');
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit';
+        submitBtn.textContent = 'Отправить';
     }
 }
 
